@@ -1,0 +1,121 @@
+AWS クラウドサービス知識クイズ（Amazon Q + Slack）要件定義書
+=========================================================
+
+1. 文書の目的
+-----------
+本要件定義書は、「Amazon Q + Slack インタラクティブ クラウドサービス 知識クイズ」ミニゲームの建設目標、機能要件、非機能要件、システムアーキテクチャ、および実装計画を明確化し、後続の設計、開発、テスト、運用に統一的な参照を提供することを目的とします。
+
+2. プロジェクト背景
+-----------
+生成AI とServerless 技術の融合により、企業はチャットプラットフォーム内でインタラクティブなアプリケーションを迅速に構築できるようになりました。本プロジェクトは、Amazon Q の Slack における Q&A 機能を活用し、AWS Lambda、Amazon DynamoDB などの Serverless サービスと組み合わせることで、ユーザーにリアルタイムでインタラクティブな AWS クラウドサービス知識クイズゲームを提供し、技術文化の雰囲気を向上させます。
+
+3. プロジェクト目標
+-----------
+1. Slack で `/awsquiz` Slash コマンドにより多肢選択問題を生成し、ユーザーがボタンをクリックして回答し、即座にスコアフィードバックを受け取る
+2. `/leaderboard` コマンドを提供し、最高スコアランキングを表示して競争的な雰囲気を醸成する
+3. Amazon Q Chat API を通じて問題バンクを自動生成し、手動メンテナンスを不要にする
+4. 完全マネージド Serverless アーキテクチャを使用し、デプロイと運用を簡素化し、コストを制御する
+
+4. プロジェクト範囲
+-----------
+4.1 機能範囲
+- F1 問題生成：Amazon Q Chat API に基づいて1問の多肢選択問題（1つの正解と複数の偽答を含む）を生成
+- F2 メッセージインタラクション：Slack Block Kit を使用してボタン付きの問題カードをユーザーにプッシュ；ユーザーのボタンクリックイベントを受信
+- F3 回答判定とスコアリング：Lambda がユーザーの選択に基づいて正誤を判定し、リアルタイムでスコアを更新してフィードバックメッセージを送信
+- F4 スコア保存：DynamoDB を使用して `user_id` ディメンションでスコアを永続化
+- F5 リーダーボード：`/leaderboard` コマンドでスコア上位5名と個人ランキングを返す
+- F6 トピック拡張：指定クラウドサービストピックをサポート（オプション、例：EC2、S3、Serverless）
+- F7 デイリーチャレンジ（オプション）：1日1回の回答制限と最高スコア記録
+
+4.2 非機能範囲
+- NF1 可用性：通常稼働時間の可用性 ≥ 99.9%
+- NF2 パフォーマンス：Slash コマンドから問題返却まで ≤ 2秒；回答判定 ≤ 1秒
+- NF3 コスト：月次クラウドコスト ≤ 5 USD（低呼び出し量シナリオ）
+- NF4 セキュリティ：AWS ベストプラクティスに従い、機密情報（Slack Token、Signing Secret）を AWS Secrets Manager に保存
+- NF5 デプロイの容易さ：AWS SAM CLI でワンクリックデプロイ/削除
+
+5. システムアーキテクチャ
+-----------
+```txt
+User ➜ Slack Slash Command (/awsquiz) ➜ Amazon Q (Slack 統合) ➜ AWS Lambda (問題ロジック & スコアリング)
+        ↘ Slack Message (問題 & スコアフィードバック)
+AWS Lambda ➜ Amazon DynamoDB (QuizScores テーブル)
+```
+
+6. 主要コンポーネント説明
+-----------
+| コンポーネント | 説明 |
+|------|------|
+| Slack Slash Command | `/awsquiz` と `/leaderboard` リクエストをトリガー |
+| Amazon Q Slack Integration | Slack メッセージを Amazon Q 呼び出しに変換し、生成されたコンテンツを返す |
+| AWS Lambda | Python 3.10 ランタイム、ビジネスロジック担当：イベント解析、BedrockRuntime 呼び出し、回答判定、スコア永続化 |
+| Amazon DynamoDB | `QuizScores` テーブル、主キー `user_id`、`score`、`timestamp` などを保存 |
+| Amazon API Gateway | Slack 呼び出し用の `/quiz` と `/leaderboard` HTTPS エンドポイントを公開 |
+
+7. 機能要件詳細説明
+-----------
+R1 ユーザーは `/awsquiz` コマンドで1問の多肢選択問題を取得できる
+R2 問題面は問題文、4つの選択肢（デフォルト単一選択）、およびインタラクティブボタンを含む
+R3 ユーザーがボタンをクリックすると、Lambda は「正解/不正解」フィードバックと現在の累計スコアを返す
+R4 システムは DynamoDB でユーザーの累計スコアを更新；記録がない場合は挿入
+R5 `/leaderboard` はスコア最高の上位5名と現在のユーザーランキングを返す
+R6 管理者は環境変数で1日の問題数、トピックリストなどのパラメータを設定可能
+
+8. データモデル
+-----------
+DynamoDB `QuizScores` テーブル：
+- Partition Key: `user_id` (String)
+- Attributes: `score` (Number), `last_updated` (String ISO8601)
+
+9. 外部インターフェース
+-----------
+1. Slack Slash Command
+   - `/awsquiz` → API Gateway `/quiz` に POST JSON
+   - `/leaderboard` → API Gateway `/leaderboard` に POST JSON
+2. Amazon Q Chat API
+   - `BedrockRuntime.invoke_model`
+3. Slack Web API
+   - `chat.postMessage` で回答フィードバックを送信
+
+10. 権限とセキュリティ
+-----------
+- Lambda 実行ロールには最小権限が必要：
+  * `bedrock:InvokeModel` の呼び出し
+  * `QuizScores` テーブルに対する `dynamodb:*` の読み書き
+  * Slack Token などを読み取るための `secretsmanager:GetSecretValue` の呼び出し
+- API Gateway で Slack リクエスト検証（Signing Secret）を有効化
+
+11. デプロイフロー
+-----------
+1. `sam init` でプロジェクトテンプレートを作成
+2. `template.yaml` で Lambda、API Gateway、DynamoDB リソースを宣言
+3. `sam build && sam deploy --guided` を実行して `us-east-1` にデプロイ
+4. Slack App で Slash Command URL をデプロイ後の API Gateway エンドポイントに設定
+
+12. テスト計画
+-----------
+- 単体テスト：Lambda の問題解析、スコアリングロジックに対して Python `pytest` でカバレッジ ≥ 80%
+- 統合テスト：Slack イベントをシミュレートしてデバッグ、問題生成とスコア保存を検証
+- パフォーマンステスト：50並行リクエスト時の平均遅延 ≤ 3秒
+
+13. 費用見積もり
+-----------
+| サービス | 詳細 | 月次費用 (低呼び出し) |
+|------|------|------------------|
+| Amazon Q Slack 統合 | プレビュー無料 | 0 USD |
+| AWS Lambda | 10000 リクエスト / 128MB / <1秒 | < 0.20 USD |
+| API Gateway | 10000 リクエスト | < 0.30 USD |
+| DynamoDB On-Demand | 20000 R/W 単位 | ≈ 0.60 USD |
+| **合計** | | ≈ 1.1 USD |
+
+14. リスクと軽減策
+-----------
+- Amazon Q 価格戦略の変更 → 公式発表を継続的に監視し、コストを評価
+- Slack API レート制限 → リトライとクールダウン戦略を実装
+- DynamoDB 容量急増 → Auto Scaling を有効化し、CloudWatch アラームを監視
+
+15. 参考文書
+-----------
+- Amazon Q 公式ドキュメント <https://docs.aws.amazon.com/amazonq/>
+- AWS SAM 開発者ガイド <https://docs.aws.amazon.com/serverless-application-model/>
+- Slack API 開発ガイド <https://api.slack.com/docs> 

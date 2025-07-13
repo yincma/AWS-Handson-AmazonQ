@@ -1,56 +1,56 @@
-# 部署指南
+# デプロイガイド
 
-## 前置要求
+## 前提条件
 
-1. **AWS CLI 配置**
+1. **AWS CLI 設定**
 ```bash
 aws configure
-# 输入 Access Key ID, Secret Access Key, Region (us-east-1), Output format (json)
+# Access Key ID, Secret Access Key, Region (us-east-1), Output format (json) を入力
 ```
 
-2. **SAM CLI 安装**
+2. **SAM CLI インストール**
 ```bash
-# Windows (使用 Chocolatey)
+# Windows (Chocolatey使用)
 choco install aws-sam-cli
 
-# 或下载 MSI 安装包
+# または MSI インストールパッケージをダウンロード
 # https://github.com/aws/aws-sam-cli/releases/latest
 ```
 
-3. **Python 3.10 安装**
+3. **Python 3.10 インストール**
 ```bash
-python --version  # 确认版本 >= 3.10
+python --version  # バージョン >= 3.10 を確認
 ```
 
-## Slack 应用配置
+## Slack アプリケーション設定
 
-### 1. 创建 Slack 应用
-1. 访问 https://api.slack.com/apps
-2. 点击 "Create New App" → "From scratch"
-3. 输入应用名称和选择工作区
+### 1. Slack アプリ作成
+1. https://api.slack.com/apps にアクセス
+2. "Create New App" → "From scratch" をクリック
+3. アプリ名とワークスペースを入力
 
-### 2. 配置 Slash Commands
-在 Slack 应用设置中：
-1. 进入 "Slash Commands"
-2. 创建 `/awsquiz` 命令
+### 2. Slash Commands 設定
+Slack アプリ設定で：
+1. "Slash Commands" に移動
+2. `/awsquiz` コマンド作成
    - Request URL: `https://your-api-gateway-url/prod/slack/command`
-   - Short Description: "AWS 云服务知识竞猜"
-3. 创建 `/leaderboard` 命令
+   - Short Description: "AWS クラウドサービス知識クイズ"
+3. `/leaderboard` コマンド作成
    - Request URL: `https://your-api-gateway-url/prod/slack/command`
-   - Short Description: "查看排行榜"
+   - Short Description: "ランキング表示"
 
-### 3. 配置 Interactive Components
-1. 进入 "Interactivity & Shortcuts"
-2. 启用 Interactivity
+### 3. Interactive Components 設定
+1. "Interactivity & Shortcuts" に移動
+2. Interactivity を有効化
 3. Request URL: `https://your-api-gateway-url/prod/slack/interaction`
 
-### 4. 获取密钥
-- **Signing Secret**: 在 "Basic Information" → "App Credentials"
-- **Bot Token**: 在 "OAuth & Permissions" → "Bot User OAuth Token"
+### 4. 認証情報取得
+- **Signing Secret**: "Basic Information" → "App Credentials" で確認
+- **Bot Token**: "OAuth & Permissions" → "Bot User OAuth Token" で確認
 
-## AWS Secrets Manager 配置
+## AWS Secrets Manager 設定
 
-### 1. 存储 Slack Signing Secret
+### 1. Slack Signing Secret を保存
 ```bash
 aws secretsmanager create-secret \
     --name "slack/signing-secret" \
@@ -58,7 +58,7 @@ aws secretsmanager create-secret \
     --secret-string "your_signing_secret_here"
 ```
 
-### 2. 存储 Slack Bot Token
+### 2. Slack Bot Token を保存
 ```bash
 aws secretsmanager create-secret \
     --name "slack/bot-token" \
@@ -66,48 +66,48 @@ aws secretsmanager create-secret \
     --secret-string "xoxb-your-bot-token-here"
 ```
 
-## 本地开发与测试
+## ローカル開発とテスト
 
-### 1. 安装依赖
+### 1. 依存関係インストール
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. 本地测试
+### 2. ローカルテスト
 ```bash
-# 构建应用
+# アプリケーションをビルド
 sam build
 
-# 本地启动 API
+# ローカル API を起動
 sam local start-api --port 3000
 
-# 测试 quiz 命令
+# quiz コマンドをテスト
 sam local invoke SlackQuizFunction --event events/quiz_event.json
 
-# 测试 leaderboard 命令  
+# leaderboard コマンドをテスト  
 sam local invoke SlackQuizFunction --event events/leaderboard_event.json
 ```
 
-### 3. 本地调试
+### 3. ローカルデバッグ
 ```bash
-# 启动调试模式
+# デバッグモードで起動
 sam local start-api --debug-port 5858 --port 3000
 
-# 使用 VS Code 或其他 IDE 连接调试端口
+# VS Code または他の IDE でデバッグポートに接続
 ```
 
-## 生产部署
+## 本番デプロイ
 
-### 1. 首次部署
+### 1. 初回デプロイ
 ```bash
-# 构建应用
+# アプリケーションをビルド
 sam build
 
-# 引导式部署（首次）
+# ガイド付きデプロイ（初回）
 sam deploy --guided
 ```
 
-部署过程中会提示输入：
+デプロイ中に以下の入力が求められます：
 - Stack Name: `slack-aws-quiz`
 - AWS Region: `us-east-1`
 - Parameter SlackSigningSecret: `arn:aws:secretsmanager:us-east-1:YOUR_ACCOUNT:secret:slack/signing-secret`
@@ -116,12 +116,12 @@ sam deploy --guided
 - Allow SAM CLI IAM role creation: `Y`
 - Save parameters to samconfig.toml: `Y`
 
-### 2. 后续部署
+### 2. 後続デプロイ
 ```bash
 sam build && sam deploy
 ```
 
-### 3. 获取 API 端点
+### 3. API エンドポイント取得
 ```bash
 aws cloudformation describe-stacks \
     --stack-name slack-aws-quiz \
@@ -129,39 +129,39 @@ aws cloudformation describe-stacks \
     --output text
 ```
 
-## 验证部署
+## デプロイ検証
 
-### 1. 检查 Lambda 函数
+### 1. Lambda 関数確認
 ```bash
 aws lambda list-functions --query 'Functions[?contains(FunctionName, `slack-aws-quiz`)]'
 ```
 
-### 2. 检查 DynamoDB 表
+### 2. DynamoDB テーブル確認
 ```bash
 aws dynamodb describe-table --table-name QuizScores
 ```
 
-### 3. 测试 API 端点
+### 3. API エンドポイントテスト
 ```bash
 curl -X POST https://your-api-gateway-url/prod/slack/command \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "command=/awsquiz&user_id=test_user"
 ```
 
-## 监控与日志
+## 監視とログ
 
-### 1. CloudWatch 日志
+### 1. CloudWatch ログ
 ```bash
-# 查看 Lambda 日志
+# Lambda ログを確認
 aws logs describe-log-groups --log-group-name-prefix "/aws/lambda/slack-aws-quiz"
 
-# 实时查看日志
+# リアルタイムでログを確認
 sam logs --stack-name slack-aws-quiz --tail
 ```
 
-### 2. 设置告警
+### 2. アラート設定
 ```bash
-# 创建错误率告警
+# エラー率アラートを作成
 aws cloudwatch put-metric-alarm \
     --alarm-name "SlackQuiz-ErrorRate" \
     --alarm-description "Lambda error rate > 5%" \
@@ -173,34 +173,34 @@ aws cloudwatch put-metric-alarm \
     --comparison-operator GreaterThanThreshold
 ```
 
-## 故障排除
+## トラブルシューティング
 
-### 常见问题
+### よくある問題
 
-1. **签名验证失败**
-   - 检查 Secrets Manager 中的 Signing Secret
-   - 确认时间戳在 5 分钟内
+1. **署名検証失敗**
+   - Secrets Manager の Signing Secret を確認
+   - タイムスタンプが 5 分以内であることを確認
 
-2. **Bedrock 调用失败**
-   - 确认 us-east-1 区域已启用 Claude 模型
-   - 检查 IAM 权限
+2. **Bedrock 呼び出し失敗**
+   - us-east-1 リージョンで Claude モデルが有効化されていることを確認
+   - IAM 権限を確認
 
-3. **DynamoDB 写入失败**
-   - 检查表名环境变量
-   - 验证 IAM 权限
+3. **DynamoDB 書き込み失敗**
+   - テーブル名環境変数を確認
+   - IAM 権限を検証
 
-4. **Slack 命令无响应**
-   - 检查 API Gateway 端点 URL
-   - 验证 Slack 应用配置
+4. **Slack コマンド無応答**
+   - API Gateway エンドポイント URL を確認
+   - Slack アプリ設定を検証
 
-### 日志分析
+### ログ分析
 ```bash
-# 过滤错误日志
+# エラーログをフィルタリング
 aws logs filter-log-events \
     --log-group-name "/aws/lambda/slack-aws-quiz-SlackQuizFunction" \
     --filter-pattern "ERROR"
 
-# 查看最近的调用
+# 最近の呼び出しを確認
 aws logs filter-log-events \
     --log-group-name "/aws/lambda/slack-aws-quiz-SlackQuizFunction" \
     --start-time $(date -d '1 hour ago' +%s)000

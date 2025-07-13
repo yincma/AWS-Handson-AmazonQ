@@ -1,0 +1,20 @@
+あなたは経験豊富な AWS Serverless アーキテクトおよび Slack アプリケーション開発エキスパートです。
+以下の要件に基づいて、「Amazon Q + Slack インタラクティブ クラウドサービス 知識クイズ」ミニゲームの完全な実装ソリューションを生成してください。内容は以下を含みます：
+1) ディレクトリ構造の提案
+2) AWS SAM `template.yaml` サンプル（Lambda、API Gateway、DynamoDB テーブルおよび必要な IAM 権限を定義）
+3) Python 3.10 Lambda ハンドラー `app.py` コアコード（Slash Command 解析、BedrockRuntime.invoke_model 呼び出しによる多肢選択問題生成、Slack Block Kit メッセージ、ボタンコールバック処理、DynamoDB へのスコア書き込み/クエリを含む）
+4) DynamoDB `QuizScores` テーブルデータモデルの説明
+5) `/leaderboard` 処理ロジック
+6) ローカルデバッグと `sam deploy --guided` デプロイ手順
+7) 主要なセキュリティベストプラクティス（Secrets Manager での Slack Token と Signing Secret の保存など）
+8) 月次コスト予測とコスト最適化の提案
+
+要件概要：
+- Slack Slash Command `/awsquiz` で AWS クラウドサービスの多肢選択問題（4つの選択肢、単一選択）を生成
+- ユーザーがボタンをクリックすると、即座に正解/不正解のフィードバックと累計スコアを返す
+- スコアは DynamoDB に保存（主キー `user_id`）
+- Slash Command `/leaderboard` でスコア上位5名と個人ランキングを返す
+- 非機能要件：≤2秒応答、月次コスト ≤5 USD、可用性 ≥99.9%
+- オプション拡張：トピック分類、デイリーチャレンジ
+
+それでは開始してください。
