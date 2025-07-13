@@ -1,0 +1,22 @@
+
+你是一名资深 AWS Serverless 架构师和 Slack 应用开发专家。\
+请根据下列需求，为“Amazon Q + Slack 互动云服务知识竞猜”小游戏生成一个完整的实现方案，包括：
+1) 目录结构建议，
+2) AWS SAM `template.yaml` 示例（定义 Lambda、API Gateway、DynamoDB 表及必要 IAM 权限），
+3) Python 3.10 Lambda 处理器 `app.py` 核心代码（含 Slash Command 解析、调用 BedrockRuntime.invoke_model 生成多选题、Slack Block Kit 消息、按钮回调处理、分数写入/查询 DynamoDB），
+4) DynamoDB `QuizScores` 表数据模型说明，
+5) `/leaderboard` 处理逻辑，
+6) 本地调试与 `sam deploy --guided` 部署步骤，
+7) 关键安全最佳实践（如 Secrets Manager 保存 Slack Token 与 Signing Secret），
+8) 预估月度成本与成本优化建议。
+
+需求概要：
+- Slack Slash Command `/awsquiz` 生成一道 AWS 云服务多选题（4 个选项，单选）。
+- 用户点击按钮后立即返回正确/错误反馈与累计分数。
+- 分数存储在 DynamoDB（主键 `user_id`）。
+- Slash Command `/leaderboard` 返回分数前 5 名及个人排名。
+- 非功能要求：≤2 秒响应、月成本 ≤5 USD、可用性 ≥99.9%。
+- 可选扩展：主题分类、每日挑战。
+
+现在请开始编写。
+``` 

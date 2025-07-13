@@ -1,0 +1,131 @@
+AWS 云服务知识竞猜（Amazon Q + Slack）需求文档
+============================================
+
+1. 文档目的
+-----------
+本需求文档旨在明确“Amazon Q + Slack 互动云服务知识竞猜”小游戏的建设目标、功能需求、非功能需求、系统架构及实施计划，为后续的设计、开发、测试与运维提供统一参照。
+
+2. 项目背景
+-----------
+随着生成式 AI 与 Serverless 技术的融合，企业可在聊天平台内快速构建互动式应用。本项目利用 Amazon Q 在 Slack 中的问答能力，结合 AWS Lambda、Amazon DynamoDB 等 Serverless 服务，为用户提供一款实时互动的 AWS 云服务知识竞猜小游戏，提升技术文化氛围。
+
+3. 项目目标
+-----------
+1. 在 Slack 中通过 `/awsquiz` Slash 命令生成多选题，用户点击按钮答题并即时反馈得分。
+2. 提供 `/leaderboard` 命令，展示最高分排行榜，激发竞赛氛围。
+3. 通过 Amazon Q Chat API 自动生成题库，无需人工维护。
+4. 使用完全托管的 Serverless 架构，简化部署与运维，控制成本。
+
+4. 项目范围
+-----------
+4.1 功能范围
+- F1 题目生成：基于 Amazon Q Chat API 生成 1 道多选题（含 1 个正确答案与若干干扰项）。
+- F2 消息交互：使用 Slack Block Kit 向用户推送含按钮的题目卡片；接收用户按钮点击事件。
+- F3 答题判定与计分：Lambda 根据用户选择判定正误，实时更新分数并反馈消息。
+- F4 分数存储：使用 DynamoDB 按 `user_id` 维度持久化分数。
+- F5 排行榜：`/leaderboard` 命令返回分数前 5 名及个人排名。
+- F6 主题扩展：支持指定云服务主题（可选，如 EC2、S3、Serverless）。
+- F7 每日挑战（可选）：每日限定一次答题并记录最高分。
+
+4.2 非功能范围
+- NF1 可用性：正常工作时间可用性 ≥ 99.9%。
+- NF2 性能：Slash 命令至题目返回 ≤ 2s；答题判定 ≤ 1s。
+- NF3 成本：月度云成本 ≤ 5 USD（低调用量场景）。
+- NF4 安全：遵循 AWS 最佳实践，敏感信息（Slack Token、Signing Secret）存于 AWS Secrets Manager。
+- NF5 易部署：一键通过 AWS SAM CLI 部署 / 删除。
+
+5. 系统架构
+-----------
+```txt
+User ➜ Slack Slash Command (/awsquiz) ➜ Amazon Q (Slack 集成) ➜ AWS Lambda (题目逻辑 & 计分)
+        ↘ Slack Message (题目 & 分数反馈)
+AWS Lambda ➜ Amazon DynamoDB (QuizScores 表)
+```
+
+6. 关键组件说明
+-----------
+| 组件 | 说明 |
+|------|------|
+| Slack Slash Command | 触发 `/awsquiz` 和 `/leaderboard` 请求 |
+| Amazon Q Slack Integration | 负责将 Slack 消息转化为 Amazon Q 调用，并返回生成内容 |
+| AWS Lambda | Python 3.10 运行时，负责业务逻辑：解析事件、调用 BedrockRuntime、判断答案、持久化分数 |
+| Amazon DynamoDB | `QuizScores` 表，主键 `user_id`，存储 `score`、`timestamp` 等 |
+| Amazon API Gateway | 暴露 `/quiz` 与 `/leaderboard` HTTPS 端点供 Slack 调用 |
+
+7. 功能需求详细描述
+-----------
+R1 用户通过 `/awsquiz` 命令可获得 1 道多选题。
+R2 题面包含题干、4 个选项（默认单选），并附带交互按钮。
+R3 用户点击按钮后，Lambda 返回“正确/错误”反馈及当前累计分数。
+R4 系统在 DynamoDB 中更新用户累计分数；若无记录则插入。
+R5 `/leaderboard` 返回分数最高的前 5 名及当前用户排名。
+R6 管理员可在环境变量中配置每日题目数量、主题列表等参数。
+
+8. 数据模型
+-----------
+DynamoDB `QuizScores` 表：
+- Partition Key: `user_id` (String)
+- Attributes: `score` (Number), `last_updated` (String ISO8601)
+
+9. 外部接口
+-----------
+1. Slack Slash Command
+   - `/awsquiz` → POST JSON 到 API Gateway `/quiz`
+   - `/leaderboard` → POST JSON 到 API Gateway `/leaderboard`
+2. Amazon Q Chat API
+   - `BedrockRuntime.invoke_model`
+3. Slack Web API
+   - `chat.postMessage` 发送答题反馈
+
+10. 权限与安全
+-----------
+- Lambda 执行角色需最小权限：
+  * 调用 `bedrock:InvokeModel`
+  * 读写 `dynamodb:*` 针对 `QuizScores` 表
+  * 调用 `secretsmanager:GetSecretValue` 读取 Slack Token 等
+- API Gateway 启用 Slack 请求验证（Signing Secret）
+
+11. 部署流程
+-----------
+1. 使用 `sam init` 创建项目模板。
+2. 在 `template.yaml` 中声明 Lambda、API Gateway、DynamoDB 资源。
+3. 运行 `sam build && sam deploy --guided` 部署到 `us-east-1`。
+4. 在 Slack App 中配置 Slash Command URL 指向部署后的 API Gateway 端点。
+
+12. 测试计划
+-----------
+- 单元测试：对 Lambda 中的题目解析、评分逻辑进行 Python `pytest` 覆盖率 ≥ 80%。
+- 集成测试：模拟 Slack 事件调试，验证题目生成与分数存储。
+- 性能测试：并发 50 请求时平均延迟 ≤ 3s。
+
+13. 费用估算
+-----------
+| 服务 | 明细 | 月度费用 (低调用) |
+|------|------|------------------|
+| Amazon Q Slack 集成 | Preview 免费 | 0 USD |
+| AWS Lambda | 10000 请求 / 128MB / <1s | < 0.20 USD |
+| API Gateway | 10000 请求 | < 0.30 USD |
+| DynamoDB On-Demand | 20000 R/W 单位 | ≈ 0.60 USD |
+| **合计** | | ≈ 1.1 USD |
+
+14. 里程碑
+-----------
+| 阶段 | 时间 | 输出 |
+|------|------|------|
+| 需求确认 | T0 | 本文档批准 |
+| 原型开发 | T0 + 1 周 | 基本 Slash 命令 & 题目生成 |
+| 功能完善 | T0 + 2 周 | 计分、排行榜完成 |
+| 内测 & 性能优化 | T0 + 3 周 | 测试报告 |
+| 正式上线 | T0 + 4 周 | 生产部署 |
+
+15. 风险与缓解措施
+-----------
+- Amazon Q 定价策略变动 → 持续关注官方公告，评估成本。
+- Slack API 限流 → 实施重试及冷却策略。
+- DynamoDB 容量突增 → 启用 Auto Scaling 并监控 CloudWatch 告警。
+
+16. 参考文档
+-----------
+- Amazon Q 官方文档 <https://docs.aws.amazon.com/amazonq/>
+- AWS SAM 开发者指南 <https://docs.aws.amazon.com/serverless-application-model/>
+- Slack API 开发指南 <https://api.slack.com/docs> 
