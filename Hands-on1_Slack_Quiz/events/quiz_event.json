@@ -1,0 +1,10 @@
+{
+  "httpMethod": "POST",
+  "path": "/slack/command",
+  "headers": {
+    "Content-Type": "application/x-www-form-urlencoded",
+    "X-Slack-Request-Timestamp": "1640995200",
+    "X-Slack-Signature": "v0=test_signature"
+  },
+  "body": "token=test_token&team_id=T1234567890&team_domain=testteam&channel_id=C1234567890&channel_name=general&user_id=U1234567890&user_name=testuser&command=%2Fawsquiz&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2F1234%2F5678&trigger_id=123456789.987654321.abcdef"
+}
